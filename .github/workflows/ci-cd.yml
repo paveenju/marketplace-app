@@ -1,0 +1,89 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+        working-directory: backend/Marketplace.Api
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: backend/Marketplace.Api
+
+      # - name: Test
+      #   run: dotnet test --no-build --configuration Release
+      #   working-directory: backend/Marketplace.Api
+      #   (add a test project under backend/ and un-comment once you have one)
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package.json
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build -- --configuration production
+        working-directory: frontend
+
+  build-and-push-images:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/Marketplace.Api
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/marketplace-api:latest
+            ghcr.io/${{ github.repository }}/marketplace-api:${{ github.sha }}
+
+      - name: Build & push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/marketplace-web:latest
+            ghcr.io/${{ github.repository }}/marketplace-web:${{ github.sha }}
+
+      # Add a deploy job here (SSH to a VM and `docker compose pull && up -d`,
+      # or push to Azure/AWS/Kubernetes) once you have a target environment.
