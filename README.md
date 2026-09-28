@@ -1,6 +1,6 @@
-# Marketplace — .NET + Angular refresher project
+# Minimal Marketplace — .NET + Angular project in 2026
 
-A small, complete full-stack app to refresh your .NET skills with current tooling:
+A small, complete full-stack app with current tooling:
 
 - **Backend**: ASP.NET Core Web API (C#), .NET 10, EF Core 10 + PostgreSQL, Swagger/OpenAPI, Docker.
 - **Frontend**: Angular (standalone components, new `@if`/`@for` control-flow syntax, esbuild builder), calling the backend over a REST API with `HttpClient`.
@@ -152,7 +152,7 @@ No secrets to configure for steps 1–2 (uses the automatic `GITHUB_TOKEN`); you
 
 ## Suggested next exercises
 
-Once this is running, good ways to keep refreshing your skills on top of it:
+Once this is running, good ways to keep working on top of it:
 - Add JWT authentication (ASP.NET Core Identity or a lightweight custom scheme) and protect the write endpoints.
 - Add a `Marketplace.Api.Tests` project (xUnit + `WebApplicationFactory`) and wire it into the CI job that's commented out.
 - Add pagination/sorting to `GET /api/products`.
