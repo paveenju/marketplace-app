@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Marketplace.Data</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EF Core + PostgreSQL provider (Npgsql). Pin to the 10.x line to match net10.0.
+         EF is the data access layer only - the schema is owned by Db/Scripts. -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <!-- Applies the hand-written SQL scripts at startup. -->
+    <PackageReference Include="dbup-postgresql" Version="7.0.1" />
+    <!-- AddMarketplaceData() registers the DbContext against the host's DI container. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embedded so the scripts travel inside the assembly and need no Dockerfile changes. -->
+    <EmbeddedResource Include="Db\Scripts\*.sql" />
+  </ItemGroup>
+
+</Project>

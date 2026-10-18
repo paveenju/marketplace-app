@@ -1,6 +1,6 @@
-using Marketplace.Api.Data;
+using Marketplace.Data;
 using Marketplace.Api.Dtos;
-using Marketplace.Api.Models;
+using Marketplace.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

@@ -3,9 +3,10 @@
 A small, complete full-stack app with current tooling:
 
 - **Backend**: ASP.NET Core Web API (C#), .NET 10, EF Core 10 + PostgreSQL, Swagger/OpenAPI, Docker.
+  The schema is SQL-first: hand-written scripts in `backend/Marketplace.Data/Db/Scripts/` own it, applied at startup by [DbUp](https://dbup.readthedocs.io/). EF Core is the data access layer only — it maps onto those tables, it does not generate them.
 - **Frontend**: Angular (standalone components, new `@if`/`@for` control-flow syntax, esbuild builder), calling the backend over a REST API with `HttpClient`.
 - **Data**: Products belong to Categories. Full CRUD on both, via REST.
-- **DevOps**: multi-stage Dockerfiles for both apps, a `docker-compose.yml` that wires up Postgres + API + Angular (served by nginx, which reverse-proxies `/api` to the backend), and a GitHub Actions CI/CD pipeline (build → build images → push to a container registry).
+- **DevOps**: multi-stage Dockerfiles for both apps, a `docker/docker-compose.yml` that wires up Postgres + API + Angular (served by nginx, which reverse-proxies `/api` to the backend), and a GitHub Actions CI/CD pipeline (build → build images → push to a container registry).
 
 This is deliberately "simple but real": it's small enough to read end to end in an afternoon, but structured the way a production project would be (DTOs, layered controllers, containerized, CI-ready) — a good base to extend with auth, tests, pagination, etc.
 
@@ -15,13 +16,17 @@ This is deliberately "simple but real": it's small enough to read end to end in 
 marketplace-app/
 ├── backend/
 │   ├── Marketplace.sln
-│   └── Marketplace.Api/
-│       ├── Controllers/       # ProductsController, CategoriesController (REST endpoints)
-│       ├── Models/            # EF Core entities: Product, Category
-│       ├── Dtos/              # Request/response records (never expose entities directly)
-│       ├── Data/               # DbContext + seed data
-│       ├── Program.cs          # Minimal hosting model: DI, CORS, Swagger, migrations on startup
-│       └── Dockerfile
+│   ├── .dockerignore           # sits at the build-context root (backend/)
+│   ├── Marketplace.Api/        # web layer only
+│   │   ├── Controllers/        # ProductsController, CategoriesController (REST endpoints)
+│   │   ├── Dtos/               # Request/response records (never expose entities directly)
+│   │   ├── Program.cs          # Minimal hosting model: DI, CORS, Swagger, SQL scripts on startup
+│   │   └── Dockerfile          # built with backend/ as the context, not Marketplace.Api/
+│   └── Marketplace.Data/       # data layer: the API references it, it references nothing of the API
+│       ├── Models/             # Entities: Product, Category
+│       ├── MarketplaceDbContext.cs
+│       ├── ServiceCollectionExtensions.cs   # AddMarketplaceData(connectionString)
+│       └── Db/                 # SQL-first schema: Scripts/*.sql + the DbUp runner
 ├── frontend/
 │   ├── src/app/
 │   │   ├── models/             # TS interfaces mirroring the API DTOs
@@ -29,7 +34,9 @@ marketplace-app/
 │   │   └── components/         # product-list, product-detail, product-form, category-list
 │   ├── nginx.conf              # Serves the Angular build + proxies /api to the backend
 │   └── Dockerfile
-├── docker-compose.yml          # Postgres + API + Angular/nginx, wired together
+├── docker/
+│   ├── docker-compose.yml      # Full stack: Postgres + API + Angular/nginx
+│   └── docker-compose-local.yml # Postgres only (port 7411), for running the API natively
 └── .github/workflows/ci-cd.yml # Build, test hook, and container image publish
 ```
 
@@ -63,9 +70,6 @@ npm install -g @angular/cli
 
 # Docker Desktop (for Postgres locally + full docker-compose stack)
 brew install --cask docker
-
-# EF Core CLI tool, used to create/apply migrations
-dotnet tool install --global dotnet-ef
 ```
 
 Then open a **new terminal tab** (so `PATH` picks up the new tools) and verify:
@@ -75,7 +79,6 @@ dotnet --version   # should print 10.x
 node --version     # v22.x or similar LTS
 ng version         # Angular CLI ...
 docker --version
-dotnet ef --version
 ```
 
 If any package version above has moved on by the time you read this, `brew search`/`brew info` will show what's current — the steps stay the same.
@@ -85,27 +88,39 @@ If any package version above has moved on by the time you read this, `brew searc
 Start only a Postgres container (fastest inner loop while coding the API):
 
 ```bash
-docker run --name marketplace-db -e POSTGRES_DB=marketplace \
-  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 -d postgres:16-alpine
+# from the repo root - Postgres only, published on port 7411
+docker compose -f docker/docker-compose-local.yml up -d
 ```
+
+Port **7411** is what `appsettings.Development.json` points at, so the API connects with no further configuration. Stop it again with `docker compose -f docker/docker-compose-local.yml down` (add `-v` to drop the data).
 
 Then, from `backend/Marketplace.Api`:
 
 ```bash
 cd backend/Marketplace.Api
 dotnet restore
-
-# Create the initial migration from the models, then apply it to the DB
-dotnet ef migrations add InitialCreate
-dotnet ef database update
-
 dotnet run
 ```
 
 You should see it listening (by default on `http://localhost:5187` for this project's `launchSettings`, or whatever port the console prints — check the console output). Open **`http://localhost:<port>/swagger`** to see and try the REST API interactively. `GET /api/products` and `GET /api/categories` should already return the seeded sample data.
 
-> Note: `Program.cs` also calls `db.Database.Migrate()` on startup, so once the migration exists, just running `dotnet run` again keeps the schema up to date automatically — handy in dev and in containers.
+> Note: `Program.cs` calls `DatabaseMigrator.Run(...)` on startup, which applies any not-yet-applied script from `Db/Scripts/` — so the schema is created and seeded on first run with no extra commands, in dev and in containers alike.
+
+### Changing the schema
+
+The `.sql` files are the source of truth, so there is no `dotnet ef migrations` step:
+
+1. Add a new `backend/Marketplace.Data/Db/Scripts/NNN_Description.sql` (the `NNN` prefix sets the run order).
+2. Mirror the change in `Marketplace.Data/MarketplaceDbContext.cs` (`OnModelCreating`) so EF knows about it.
+3. Restart the API — DbUp applies only the new script.
+
+**Never edit a script that has already been applied.** DbUp journals each one in a `schemaversions` table and skips it forever after; a change to an old file silently never runs. Write a new script instead.
+
+**Never rename or move a script either.** DbUp journals scripts by embedded-resource name (`Marketplace.Data.Db.Scripts.001_InitialSchema.sql`), so moving one makes DbUp treat it as new and re-run it — `001` then fails with `relation "categories" already exists` and the API refuses to start. Realign the journal rather than the scripts:
+
+```sql
+UPDATE schemaversions SET scriptname = replace(scriptname, '<old prefix>.', '<new prefix>.');
+```
 
 ## 4. Run the frontend locally
 
@@ -129,14 +144,16 @@ This builds both apps into containers and wires them to a Postgres container, ex
 
 ```bash
 # from the repo root
-docker compose up --build
+docker compose -f docker/docker-compose.yml up --build
 ```
 
-- Angular (built for production, served by nginx): **http://localhost:8080**
-- API directly (e.g. for Swagger/debugging): **http://localhost:5187/swagger** *(Swagger is only enabled when `ASPNETCORE_ENVIRONMENT=Development`; flip that env var in `docker-compose.yml` if you want it available here too)*
-- Postgres: exposed on **localhost:5432** if you want to connect a DB GUI (e.g. TablePlus, DBeaver)
+(Or `cd docker && docker compose up --build` — the compose file pins `name: marketplace-app`, so the project, its containers and its volume are named the same either way.)
 
-Stop everything with `docker compose down` (add `-v` to also drop the database volume and start fresh next time).
+- Angular (built for production, served by nginx): **http://localhost:8099**
+- API directly (e.g. for Swagger/debugging): **http://localhost:5187/swagger** *(Swagger is only enabled when `ASPNETCORE_ENVIRONMENT=Development`; flip that env var in `docker/docker-compose.yml` if you want it available here too)*
+- Postgres: exposed on **localhost:7412** if you want to connect a DB GUI (e.g. TablePlus, DBeaver)
+
+Stop everything with `docker compose -f docker/docker-compose.yml down` (add `-v` to also drop the database volume and start fresh next time).
 
 This is the shape you'd hand to a CI/CD pipeline or a cloud VM: three services, one command, no machine-specific setup beyond Docker.
 

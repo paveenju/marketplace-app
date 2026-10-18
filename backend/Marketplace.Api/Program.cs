@@ -1,5 +1,5 @@
-using Marketplace.Api.Data;
-using Microsoft.EntityFrameworkCore;
+using Marketplace.Data;
+using Marketplace.Data.Db;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,8 +22,7 @@ builder.Services.AddSwaggerGen(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-builder.Services.AddDbContext<MarketplaceDbContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Services.AddMarketplaceData(connectionString);
 
 // Allow the Angular dev server (ng serve, default port 4200) to call this API directly.
 // In production, nginx proxies /api to this service instead, so CORS isn't even hit.
@@ -39,12 +38,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ---- Migrate + seed the database on startup (handy for local/dev & first deploy) ----
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
-    db.Database.Migrate();
-}
+// ---- Apply the SQL scripts in Db/Scripts before serving traffic ----
+DatabaseMigrator.Run(connectionString);
 
 // ---- Middleware pipeline ------------------------------------------------
 

@@ -9,13 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- EF Core + PostgreSQL provider (Npgsql). Pin to the 10.x line to match net10.0. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" >
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Entities, DbContext and the SQL schema scripts live here. -->
+    <ProjectReference Include="..\Marketplace.Data\Marketplace.Data.csproj" />
   </ItemGroup>
 
 </Project>

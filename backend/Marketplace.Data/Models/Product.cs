@@ -1,4 +1,4 @@
-namespace Marketplace.Api.Models;
+namespace Marketplace.Data.Models;
 
 public class Product
 {

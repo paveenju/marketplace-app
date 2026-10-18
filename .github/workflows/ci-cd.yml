@@ -18,16 +18,16 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Restore
-        run: dotnet restore
-        working-directory: backend/Marketplace.Api
+        run: dotnet restore Marketplace.sln
+        working-directory: backend
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
-        working-directory: backend/Marketplace.Api
+        run: dotnet build Marketplace.sln --no-restore --configuration Release
+        working-directory: backend
 
       # - name: Test
-      #   run: dotnet test --no-build --configuration Release
-      #   working-directory: backend/Marketplace.Api
+      #   run: dotnet test Marketplace.sln --no-build --configuration Release
+      #   working-directory: backend
       #   (add a test project under backend/ and un-comment once you have one)
 
   build-frontend:
@@ -70,7 +70,8 @@ jobs:
       - name: Build & push API image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend/Marketplace.Api
+          context: ./backend
+          file: ./backend/Marketplace.Api/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/marketplace-api:latest

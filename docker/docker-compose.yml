@@ -1,3 +1,5 @@
+name: marketplace-app
+
 services:
   db:
     image: postgres:16-alpine
@@ -7,9 +9,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - marketplace_pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432" # exposed so you can inspect the DB locally with a GUI client if you want
+      - 7412:5432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -18,7 +20,8 @@ services:
 
   api:
     build:
-      context: ./backend/Marketplace.Api
+      context: ../backend
+      dockerfile: Marketplace.Api/Dockerfile
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -27,16 +30,16 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "5187:8080" # lets you hit the API/Swagger directly at localhost:5187 for debugging
+      - 5187:8080 # lets you hit the API/Swagger directly at localhost:5187 for debugging
 
   web:
     build:
-      context: ./frontend
+      context: ../frontend
     restart: unless-stopped
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - 8099:80
 
 volumes:
-  db_data:
+  marketplace_pgdata:

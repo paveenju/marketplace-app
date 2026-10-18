@@ -2,7 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable } from 'rxjs';
 import { Category } from '../models/category.model';
+import { Product } from '../models/product.model';
 import { CategoryService } from '../services/category.service';
 import { ProductService } from '../services/product.service';
 
@@ -132,7 +134,7 @@ export class ProductFormComponent implements OnInit {
       imageUrl: value.imageUrl || null,
     };
 
-    const request = this.isEdit
+    const request: Observable<Product | void> = this.isEdit
       ? this.productService.update(this.productId!, payload)
       : this.productService.create(payload);
 
