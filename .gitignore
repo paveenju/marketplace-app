@@ -1,3 +1,6 @@
+# Claude
+.planning/
+
 # .NET
 backend/**/bin/
 backend/**/obj/
